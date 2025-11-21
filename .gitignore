@@ -6,6 +6,10 @@ dist/
 coverage/
 DENTALDB19082025.FDB
 
+# scripts Python (não necessários para build)
+requirements.txt
+*.py
+
 # configs locais
 .env
 .env.local
