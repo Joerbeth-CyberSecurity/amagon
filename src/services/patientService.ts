@@ -207,6 +207,7 @@ export async function getPatientClinicalData(idPessoa: number): Promise<Clinical
       .order('data', { ascending: false })
     
     if (error) throw error
+    if (!data || data.length === 0) return []
     
     // Buscar IDs únicos de dentistas (iddentista = idpessoa diretamente)
     const dentistasIds = [...new Set((data || []).map((r: any) => r.iddentista).filter(Boolean))]
@@ -226,46 +227,55 @@ export async function getPatientClinicalData(idPessoa: number): Promise<Clinical
       }
     }
     
-    const orcamentos: ClinicalData[] = (data || []).map((row: any) => ({
-      idorcamento: row.idorcamento,
-      dtorcamento: row.data,
-      valortotal: row.total,
-      tpregistro: row.tpregistro,
-      nome_dentista: row.iddentista ? dentistasMap.get(row.iddentista) || null : null,
-      itens: []
-    }))
+    const orcamentosIds = data.map((o: any) => o.idorcamento)
     
-    // Buscar itens de cada orÃ§amento
-    for (const orc of orcamentos) {
-      const { data: itens } = await supabase
-        .from('amb_orcaitem')
-        .select('idorcaitem, linha, iditem, qtde, valor, idprocedimento')
-        .eq('idorcamento', orc.idorcamento)
-        .order('linha', { ascending: true, nullsFirst: false })
-      
-      if (itens && itens.length > 0) {
-        // Buscar IDs únicos de procedimentos
-        const procedimentosIds = [...new Set(itens.map((i: any) => i.idprocedimento).filter(Boolean))]
-        
-        // Buscar descrições dos procedimentos
-        const procedimentosMap = new Map<number, { nome: string; codigo: string | null }>()
-        if (procedimentosIds.length > 0) {
-          const { data: procedimentos } = await supabase
-            .from('fat_procedimento')
-            .select('idprocedimento, procedimento, codigo')
-            .in('idprocedimento', procedimentosIds)
-          
-          if (procedimentos) {
-            for (const proc of procedimentos) {
-              procedimentosMap.set(proc.idprocedimento, {
-                nome: proc.procedimento || '',
-                codigo: proc.codigo || null
-              })
-            }
-          }
+    // Buscar TODOS os itens de uma vez (otimização)
+    const { data: allItens } = await supabase
+      .from('amb_orcaitem')
+      .select('idorcaitem, idorcamento, linha, iditem, qtde, valor, idprocedimento')
+      .in('idorcamento', orcamentosIds)
+      .order('linha', { ascending: true, nullsFirst: false })
+    
+    // Agrupar itens por orçamento
+    const itensPorOrcamento = new Map<number, any[]>()
+    if (allItens) {
+      for (const item of allItens) {
+        if (!itensPorOrcamento.has(item.idorcamento)) {
+          itensPorOrcamento.set(item.idorcamento, [])
         }
-        
-        orc.itens = itens.map((item: any) => {
+        itensPorOrcamento.get(item.idorcamento)!.push(item)
+      }
+    }
+    
+    // Buscar TODOS os procedimentos de uma vez (otimização)
+    const procedimentosIds = [...new Set((allItens || []).map((i: any) => i.idprocedimento).filter(Boolean))]
+    const procedimentosMap = new Map<number, { nome: string; codigo: string | null }>()
+    if (procedimentosIds.length > 0) {
+      const { data: procedimentos } = await supabase
+        .from('fat_procedimento')
+        .select('idprocedimento, procedimento, codigo')
+        .in('idprocedimento', procedimentosIds)
+      
+      if (procedimentos) {
+        for (const proc of procedimentos) {
+          procedimentosMap.set(proc.idprocedimento, {
+            nome: proc.procedimento || '',
+            codigo: proc.codigo || null
+          })
+        }
+      }
+    }
+    
+    const orcamentos: ClinicalData[] = data.map((row: any) => {
+      const itens = itensPorOrcamento.get(row.idorcamento) || []
+      
+      return {
+        idorcamento: row.idorcamento,
+        dtorcamento: row.data,
+        valortotal: row.total,
+        tpregistro: row.tpregistro,
+        nome_dentista: row.iddentista ? dentistasMap.get(row.iddentista) || null : null,
+        itens: itens.map((item: any) => {
           const proc = item.idprocedimento ? procedimentosMap.get(item.idprocedimento) : null
           const nome_procedimento = proc?.nome || null
           const codigo_procedimento = proc?.codigo || null
@@ -280,7 +290,7 @@ export async function getPatientClinicalData(idPessoa: number): Promise<Clinical
           }
         })
       }
-    }
+    })
     
     return orcamentos
     
@@ -612,51 +622,61 @@ export async function getPatientOrthodontics(idPessoa: number): Promise<Orthodon
       itens: []
     }))
     
-    // Buscar itens de cada orçamento ortodôntico
-    for (const orc of orcamentos) {
-      const { data: itens } = await supabase
-        .from('amb_orcaitem')
-        .select('idorcaitem, linha, iditem, qtde, valor, idprocedimento')
-        .eq('idorcamento', orc.idorcamento)
-        .order('linha', { ascending: true, nullsFirst: false })
-      
-      if (itens && itens.length > 0) {
-        // Buscar IDs únicos de procedimentos
-        const procedimentosIds = [...new Set(itens.map((i: any) => i.idprocedimento).filter(Boolean))]
-        
-        // Buscar descrições dos procedimentos
-        const procedimentosMap = new Map<number, { nome: string; codigo: string | null }>()
-        if (procedimentosIds.length > 0) {
-          const { data: procedimentos } = await supabase
-            .from('fat_procedimento')
-            .select('idprocedimento, procedimento, codigo')
-            .in('idprocedimento', procedimentosIds)
-          
-          if (procedimentos) {
-            for (const proc of procedimentos) {
-              procedimentosMap.set(proc.idprocedimento, {
-                nome: proc.procedimento || '',
-                codigo: proc.codigo || null
-              })
-            }
-          }
+    // Buscar TODOS os itens de uma vez (otimização)
+    const orcamentosIds = orcamentos.map(o => o.idorcamento)
+    const { data: allItens } = await supabase
+      .from('amb_orcaitem')
+      .select('idorcaitem, idorcamento, linha, iditem, qtde, valor, idprocedimento')
+      .in('idorcamento', orcamentosIds)
+      .order('linha', { ascending: true, nullsFirst: false })
+    
+    // Agrupar itens por orçamento
+    const itensPorOrcamento = new Map<number, any[]>()
+    if (allItens) {
+      for (const item of allItens) {
+        if (!itensPorOrcamento.has(item.idorcamento)) {
+          itensPorOrcamento.set(item.idorcamento, [])
         }
-        
-        orc.itens = itens.map((item: any) => {
-          const proc = item.idprocedimento ? procedimentosMap.get(item.idprocedimento) : null
-          const nome_procedimento = proc?.nome || null
-          const codigo_procedimento = proc?.codigo || null
-          const item_cod = item.linha || codigo_procedimento || item.iditem?.toString() || ''
-          
-          return {
-            idorcaitem: item.idorcaitem,
-            item: item_cod,
-            quantidade: item.qtde,
-            valor: item.valor,
-            nome_procedimento
-          }
-        })
+        itensPorOrcamento.get(item.idorcamento)!.push(item)
       }
+    }
+    
+    // Buscar TODOS os procedimentos de uma vez (otimização)
+    const procedimentosIds = [...new Set((allItens || []).map((i: any) => i.idprocedimento).filter(Boolean))]
+    const procedimentosMap = new Map<number, { nome: string; codigo: string | null }>()
+    if (procedimentosIds.length > 0) {
+      const { data: procedimentos } = await supabase
+        .from('fat_procedimento')
+        .select('idprocedimento, procedimento, codigo')
+        .in('idprocedimento', procedimentosIds)
+      
+      if (procedimentos) {
+        for (const proc of procedimentos) {
+          procedimentosMap.set(proc.idprocedimento, {
+            nome: proc.procedimento || '',
+            codigo: proc.codigo || null
+          })
+        }
+      }
+    }
+    
+    // Mapear itens para cada orçamento
+    for (const orc of orcamentos) {
+      const itens = itensPorOrcamento.get(orc.idorcamento) || []
+      orc.itens = itens.map((item: any) => {
+        const proc = item.idprocedimento ? procedimentosMap.get(item.idprocedimento) : null
+        const nome_procedimento = proc?.nome || null
+        const codigo_procedimento = proc?.codigo || null
+        const item_cod = item.linha || codigo_procedimento || item.iditem?.toString() || ''
+        
+        return {
+          idorcaitem: item.idorcaitem,
+          item: item_cod,
+          quantidade: item.qtde,
+          valor: item.valor,
+          nome_procedimento
+        }
+      })
     }
     
     return orcamentos
