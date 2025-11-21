@@ -1,0 +1,18 @@
+# dependências
+node_modules/
+
+# builds
+dist/
+coverage/
+DENTALDB19082025.FDB
+
+# configs locais
+.env
+.env.local
+
+# sistema operacional / IDE
+.DS_Store
+Thumbs.db
+*.log
+.vscode/
+.idea/

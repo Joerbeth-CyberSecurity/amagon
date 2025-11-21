@@ -1,0 +1,96 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Sistema de Consulta Odontológica</title>
+    <link rel="stylesheet" href="/style.css" />
+  </head>
+  <body>
+    <div id="app">
+      <!-- Tela de Busca -->
+      <div id="search-screen" class="screen">
+        <header>
+          <h1>🦷 Sistema de Consulta Odontológica</h1>
+          <p>Pesquise pacientes por nome ou CPF</p>
+        </header>
+
+        <main>
+          <div class="search-container">
+            <input
+              type="text"
+              id="search-input"
+              placeholder="Digite o nome ou CPF do paciente..."
+              autocomplete="off"
+            />
+            <button id="search-btn">🔍 Buscar</button>
+          </div>
+
+          <div id="search-results" class="results-container hidden">
+            <h2>Resultados da Busca</h2>
+            <div id="results-list"></div>
+          </div>
+
+          <div id="loading" class="hidden">
+            <div class="spinner"></div>
+            <p>Buscando...</p>
+          </div>
+        </main>
+      </div>
+
+      <!-- Tela de Visualização do Paciente -->
+      <div id="patient-screen" class="screen hidden">
+        <header>
+          <button id="back-btn">← Voltar</button>
+          <h1 id="patient-name">Dados do Paciente</h1>
+        </header>
+
+        <main>
+          <div class="sections-grid">
+            <section class="section-card">
+              <h2>📋 Cadastro</h2>
+              <div id="patient-data"></div>
+            </section>
+
+            <section class="section-card">
+              <h2>📅 Agendamentos</h2>
+              <div id="appointments-data"></div>
+            </section>
+
+            <section class="section-card">
+              <h2>🧑‍⚕️ Corpo Clínico</h2>
+              <div id="clinical-team-data"></div>
+            </section>
+
+            <section class="section-card">
+              <h2>🦷 Dados Clínicos</h2>
+              <div id="clinical-data"></div>
+            </section>
+
+            <section class="section-card">
+              <h2>💰 Financeiro</h2>
+              <div id="financial-data"></div>
+            </section>
+
+            <section class="section-card">
+              <h2>📝 Anamnese</h2>
+              <div id="anamnese-data"></div>
+            </section>
+
+            <section class="section-card">
+              <h2>🦷 Ortodontia</h2>
+              <div id="orthodontics-data"></div>
+            </section>
+
+            <section class="section-card">
+              <h2>📷 Raios-X / Imagens</h2>
+              <div id="images-data"></div>
+            </section>
+          </div>
+        </main>
+      </div>
+    </div>
+
+    <script type="module" src="/main.js"></script>
+  </body>
+</html>

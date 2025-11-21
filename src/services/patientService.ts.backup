@@ -1,0 +1,644 @@
+import { supabase } from '@/lib/supabase'
+import type {
+  Patient,
+  Appointment,
+  ClinicalData,
+  FinancialData,
+  ClinicalTeamMember,
+  Anamnese,
+  PatientImage,
+  OrcamentoImage,
+  Orthodontics
+} from '@/types/patient'
+import { cleanCPF } from '@/utils/formatters'
+
+/**
+ * Busca pacientes por nome (parcial) ou CPF
+ */
+export async function searchPatients(searchTerm: string): Promise<Patient[]> {
+  try {
+    // Remove espaços e caracteres especiais do CPF, mantendo apenas números
+    const cleanTerm = cleanCPF(searchTerm.trim())
+    
+    // Verifica se é busca por CPF (tem pelo menos 9 dígitos numéricos)
+    const isCPF = cleanTerm.length >= 9 && /^\d+$/.test(cleanTerm)
+    
+    let query = supabase
+      .from('sis_pessoa')
+      .select(`
+        idpessoa,
+        pessoa,
+        cnpj_cpf,
+        nascimento,
+        email,
+        endereco
+      `)
+      .limit(50)
+    
+    if (isCPF) {
+      // Busca por CPF - usando ILIKE com pattern matching
+      query = query.ilike('cnpj_cpf', `%${cleanTerm}%`)
+    } else {
+      // Busca por nome
+      query = query.ilike('pessoa', `%${searchTerm.trim()}%`)
+    }
+    
+    const { data, error } = await query.order('pessoa')
+    
+    if (error) throw error
+    
+    // Transforma os dados para o formato esperado
+    return (data || []).map((row: any) => ({
+      idpessoa: row.idpessoa,
+      nomepessoa: row.pessoa,
+      cpf: row.cnpj_cpf,
+      dtnasc: row.nascimento,
+      email: row.email,
+      endereco: row.endereco,
+      idpaciente: row.idpessoa // Usando idpessoa como idpaciente
+    }))
+    
+  } catch (error) {
+    console.error('Erro ao buscar pacientes:', error)
+    throw error
+  }
+}
+
+/**
+ * Busca dados básicos de um paciente específico
+ */
+export async function getPatientById(idPessoa: number): Promise<Patient | null> {
+  try {
+    const { data, error } = await supabase
+      .from('sis_pessoa')
+      .select('idpessoa, pessoa, cnpj_cpf, nascimento, email, endereco')
+      .eq('idpessoa', idPessoa)
+      .single()
+    
+    if (error) throw error
+    if (!data) return null
+    
+    return {
+      idpessoa: data.idpessoa,
+      nomepessoa: data.pessoa,
+      cpf: data.cnpj_cpf,
+      dtnasc: data.nascimento,
+      email: data.email,
+      endereco: data.endereco,
+      idpaciente: data.idpessoa
+    }
+    
+  } catch (error) {
+    console.error('Erro ao buscar dados do paciente:', error)
+    throw error
+  }
+}
+
+/**
+ * Busca agendamentos de um paciente
+ */
+export async function getPatientAppointments(idPessoa: number): Promise<Appointment[]> {
+  try {
+    const { data, error } = await supabase
+      .from('amb_marcacao')
+      .select('idmarcacao, data, hora, isatendido, isbloqueado, dtcanc, dtfaltou, iddentista')
+      .eq('idpaciente', idPessoa)
+      .order('data', { ascending: false })
+      .order('hora', { ascending: false })
+    
+    if (error) throw error
+    
+    return (data || []).map((row: any) => {
+      let status = 'Agendado'
+      if (row.isatendido === 1) status = 'Atendido'
+      else if (row.isbloqueado === 1) status = 'Bloqueado'
+      else if (row.dtcanc) status = 'Cancelado'
+      else if (row.dtfaltou) status = 'Faltou'
+      
+      return {
+        idmarcacao: row.idmarcacao,
+        dtmarcacao: row.data,
+        hrmarcacao: row.hora,
+        status,
+        nome_dentista: null // Será buscado separadamente se necessário
+      }
+    })
+    
+  } catch (error) {
+    console.error('Erro ao buscar agendamentos:', error)
+    throw error
+  }
+}
+
+/**
+ * Busca dados clínicos (orçamentos/contratos) de um paciente
+ */
+export async function getPatientClinicalData(idPessoa: number): Promise<ClinicalData[]> {
+  try {
+    const { data, error } = await supabase
+      .from('amb_orcamento')
+      .select('idorcamento, data, total, tpregistro, iddentista')
+      .eq('idpaciente', idPessoa)
+      .order('data', { ascending: false })
+    
+    if (error) throw error
+    
+    const orcamentos: ClinicalData[] = (data || []).map((row: any) => ({
+      idorcamento: row.idorcamento,
+      dtorcamento: row.data,
+      valortotal: row.total,
+      tpregistro: row.tpregistro,
+      nome_dentista: null, // Será buscado separadamente se necessário
+      itens: []
+    }))
+    
+    // Buscar itens de cada orçamento
+    for (const orc of orcamentos) {
+      const { data: itens } = await supabase
+        .from('amb_orcaitem')
+        .select('idorcaitem, linha, iditem, qtde, valor, idprocedimento')
+        .eq('idorcamento', orc.idorcamento)
+        .order('linha')
+      
+      orc.itens = (itens || []).map((item: any) => ({
+        idorcaitem: item.idorcaitem,
+        item: item.linha || item.iditem?.toString() || '',
+        quantidade: item.qtde,
+        valor: item.valor,
+        nome_procedimento: null // Será buscado separadamente se necessário
+      }))
+    }
+    
+    return orcamentos
+    
+  } catch (error) {
+    console.error('Erro ao buscar dados clínicos:', error)
+    throw error
+  }
+}
+
+/**
+ * Busca dados financeiros de um paciente
+ */
+export async function getPatientFinancialData(idPessoa: number): Promise<FinancialData> {
+  try {
+    // Busca lançamentos a receber
+    const { data: lancamentos, error: lancError } = await supabase
+      .from('fin_lancamentopr')
+      .select('idlancamento, dtvencimento, vrliquido, isencerrado')
+      .eq('idpessoa', idPessoa)
+      .order('dtvencimento', { ascending: false })
+    
+    if (lancError) throw lancError
+    
+    // Busca movimentações - buscar todos os lançamentos primeiro, depois filtrar
+    const lancamentosIds = (lancamentos || []).map(l => l.idlancamento)
+    
+    let movData = []
+    if (lancamentosIds.length > 0) {
+      const { data, error: movError } = await supabase
+        .from('fin_movconta')
+        .select('idmovconta, dtmovimento, valormovimento, iscredito, idlancamento')
+        .in('idlancamento', lancamentosIds)
+        .order('dtmovimento', { ascending: false })
+      
+      if (movError) throw movError
+      movData = data || []
+    }
+    
+    return {
+      lancamentos: (lancamentos || []).map((row: any) => ({
+        idlancamento: row.idlancamento,
+        dtvencimento: row.dtvencimento,
+        valorlancamento: row.vrliquido,
+        status: row.isencerrado === 1 ? 'Liquidado' : 'Em aberto'
+      })),
+      movimentacoes: (movData || []).map((row: any) => ({
+        idmovconta: row.idmovconta,
+        dtmovimento: row.dtmovimento,
+        valormovimento: row.valormovimento,
+        iscredito: row.iscredito
+      }))
+    }
+    
+  } catch (error) {
+    console.error('Erro ao buscar dados financeiros:', error)
+    throw error
+  }
+}
+
+/**
+ * Busca corpo clínico associado ao paciente
+ */
+export async function getPatientClinicalTeam(idPessoa: number): Promise<ClinicalTeamMember[]> {
+  try {
+    // Buscar dentistas de agendamentos e orçamentos
+    const { data, error } = await supabase.rpc('get_patient_clinical_team', {
+      p_idpessoa: idPessoa
+    })
+    
+    if (error) {
+      // Se a function não existir, fazer query manual
+      const { data: marcacoes } = await supabase
+        .from('amb_marcacao')
+        .select('iddentista')
+        .eq('idpaciente', idPessoa)
+        .not('iddentista', 'is', null)
+      
+      const { data: orcamentos } = await supabase
+        .from('amb_orcamento')
+        .select('iddentista')
+        .eq('idpaciente', idPessoa)
+        .not('iddentista', 'is', null)
+      
+      const dentistasIds = new Set([
+        ...(marcacoes || []).map((m: any) => m.iddentista),
+        ...(orcamentos || []).map((o: any) => o.iddentista)
+      ])
+      
+      if (dentistasIds.size === 0) return []
+      
+      const { data: dentistas } = await supabase
+        .from('sis_dentista')
+        .select('iddentista, cro, sigla, idpessoa')
+        .in('iddentista', Array.from(dentistasIds))
+      
+      return (dentistas || []).map((d: any) => ({
+        iddentista: d.iddentista,
+        nome_dentista: '', // Será buscado separadamente se necessário
+        cro: d.cro,
+        sigla: d.sigla
+      }))
+    }
+    
+    return data || []
+    
+  } catch (error) {
+    console.error('Erro ao buscar corpo clínico:', error)
+    return []
+  }
+}
+
+/**
+ * Busca dados de anamnese do paciente
+ */
+export async function getPatientAnamnese(idPessoa: number): Promise<Anamnese | null> {
+  try {
+    const { data, error } = await supabase
+      .from('sis_paciente')
+      .select(`
+        queixa,
+        sofredoenca,
+        qualdoenca,
+        medicoassist,
+        alergia,
+        qualalergia,
+        doencasexual,
+        qualdoencasexual,
+        obsbloqueiopaciente
+      `)
+      .eq('idpaciente', idPessoa)
+      .single()
+    
+    if (error) throw error
+    if (!data) return null
+    
+    return {
+      queixa: data.queixa,
+      sofredoenca: data.sofredoenca,
+      qualdoenca: data.qualdoenca,
+      medicoassist: data.medicoassist,
+      alergia: data.alergia,
+      qualalergia: data.qualalergia,
+      doencasexual: data.doencasexual,
+      qualdoencasexual: data.qualdoencasexual,
+      observacoes: data.obsbloqueiopaciente
+    }
+    
+  } catch (error) {
+    console.error('Erro ao buscar anamnese:', error)
+    return null
+  }
+}
+
+/**
+ * Busca imagens/raios-x do paciente
+ */
+export async function getPatientImages(idPessoa: number): Promise<PatientImage[]> {
+  try {
+    const { data, error } = await supabase
+      .from('sis_pacienteimagem')
+      .select('idpacienteimagem, data, historico, pathimagem, iddente, idface, orcaimagem, iddentista')
+      .eq('idpaciente', idPessoa)
+      .order('data', { ascending: false })
+    
+    if (error) throw error
+    
+    return (data || []).map((row: any) => ({
+      idpacienteimagem: row.idpacienteimagem,
+      data: row.data,
+      historico: row.historico,
+      pathimagem: row.pathimagem,
+      iddente: row.iddente,
+      idface: row.idface,
+      orcaimagem: row.orcaimagem,
+      nome_dentista: null // Será buscado separadamente se necessário
+    }))
+    
+  } catch (error) {
+    console.error('Erro ao buscar imagens:', error)
+    return []
+  }
+}
+
+/**
+ * Busca imagens de orçamentos do paciente
+ */
+export async function getPatientOrcamentoImages(idPessoa: number): Promise<OrcamentoImage[]> {
+  try {
+    // Primeiro busca orçamentos do paciente
+    const { data: orcamentosData } = await supabase
+      .from('amb_orcamento')
+      .select('idorcamento, data')
+      .eq('idpaciente', idPessoa)
+    
+    if (!orcamentosData || orcamentosData.length === 0) return []
+    
+    const orcamentosIds = orcamentosData.map(o => o.idorcamento)
+    
+    // Depois busca imagens desses orçamentos
+    const { data, error } = await supabase
+      .from('amb_orcamentoimagem')
+      .select('idorcamentoimagem, idorcamento, data, historico, pathimagem, iddente, idface, orcaimagem, idavaliacao, iddentista')
+      .in('idorcamento', orcamentosIds)
+      .order('data', { ascending: false })
+    
+    if (error) throw error
+    
+    return (data || []).map((row: any) => {
+      const orc = orcamentosData.find(o => o.idorcamento === row.idorcamento)
+      return {
+        idorcamentoimagem: row.idorcamentoimagem,
+        idorcamento: row.idorcamento,
+        data: row.data,
+        historico: row.historico,
+        pathimagem: row.pathimagem,
+        iddente: row.iddente,
+        idface: row.idface,
+        orcaimagem: row.orcaimagem,
+        idavaliacao: row.idavaliacao,
+        nome_dentista: null, // Será buscado separadamente se necessário
+        dtorcamento: orc?.data || ''
+      }
+    })
+    
+  } catch (error) {
+    console.error('Erro ao buscar imagens de orçamentos:', error)
+    return []
+  }
+}
+
+/**
+ * Busca orçamentos ortodônticos do paciente
+    
+    return {
+      lancamentos: (lancamentos || []).map((row: any) => ({
+        idlancamento: row.idlancamento,
+        dtvencimento: row.dtvencimento,
+        valorlancamento: row.vrliquido,
+        status: row.isencerrado === 1 ? 'Liquidado' : 'Em aberto'
+      })),
+      movimentacoes: (movData || []).map((row: any) => ({
+        idmovconta: row.idmovconta,
+        dtmovimento: row.dtmovimento,
+        valormovimento: row.valormovimento,
+        iscredito: row.iscredito
+      }))
+    }
+    
+  } catch (error) {
+    console.error('Erro ao buscar dados financeiros:', error)
+    throw error
+  }
+}
+
+/**
+ * Busca corpo clínico associado ao paciente
+ */
+export async function getPatientClinicalTeam(idPessoa: number): Promise<ClinicalTeamMember[]> {
+  try {
+    // Buscar dentistas de agendamentos e orçamentos
+    const { data, error } = await supabase.rpc('get_patient_clinical_team', {
+      p_idpessoa: idPessoa
+    })
+    
+    if (error) {
+      // Se a function não existir, fazer query manual
+      const { data: marcacoes } = await supabase
+        .from('amb_marcacao')
+        .select('iddentista')
+        .eq('idpaciente', idPessoa)
+        .not('iddentista', 'is', null)
+      
+      const { data: orcamentos } = await supabase
+        .from('amb_orcamento')
+        .select('iddentista')
+        .eq('idpaciente', idPessoa)
+        .not('iddentista', 'is', null)
+      
+      const dentistasIds = new Set([
+        ...(marcacoes || []).map((m: any) => m.iddentista),
+        ...(orcamentos || []).map((o: any) => o.iddentista)
+      ])
+      
+      if (dentistasIds.size === 0) return []
+      
+      const { data: dentistas } = await supabase
+        .from('sis_dentista')
+        .select('iddentista, cro, sigla, idpessoa')
+        .in('iddentista', Array.from(dentistasIds))
+      
+      return (dentistas || []).map((d: any) => ({
+        iddentista: d.iddentista,
+        nome_dentista: '', // Será buscado separadamente se necessário
+        cro: d.cro,
+        sigla: d.sigla
+      }))
+    }
+    
+    return data || []
+    
+  } catch (error) {
+    console.error('Erro ao buscar corpo clínico:', error)
+    return []
+  }
+}
+
+/**
+ * Busca dados de anamnese do paciente
+ */
+export async function getPatientAnamnese(idPessoa: number): Promise<Anamnese | null> {
+  try {
+    const { data, error } = await supabase
+      .from('sis_paciente')
+      .select(`
+        queixa,
+        sofredoenca,
+        qualdoenca,
+        medicoassist,
+        alergia,
+        qualalergia,
+        doencasexual,
+        qualdoencasexual,
+        obsbloqueiopaciente
+      `)
+      .eq('idpaciente', idPessoa)
+      .single()
+    
+    if (error) throw error
+    if (!data) return null
+    
+    return {
+      queixa: data.queixa,
+      sofredoenca: data.sofredoenca,
+      qualdoenca: data.qualdoenca,
+      medicoassist: data.medicoassist,
+      alergia: data.alergia,
+      qualalergia: data.qualalergia,
+      doencasexual: data.doencasexual,
+      qualdoencasexual: data.qualdoencasexual,
+      observacoes: data.obsbloqueiopaciente
+    }
+    
+  } catch (error) {
+    console.error('Erro ao buscar anamnese:', error)
+    return null
+  }
+}
+
+/**
+ * Busca imagens/raios-x do paciente
+ */
+export async function getPatientImages(idPessoa: number): Promise<PatientImage[]> {
+  try {
+    const { data, error } = await supabase
+      .from('sis_pacienteimagem')
+      .select('idpacienteimagem, data, historico, pathimagem, iddente, idface, orcaimagem, iddentista')
+      .eq('idpaciente', idPessoa)
+      .order('data', { ascending: false })
+    
+    if (error) throw error
+    
+    return (data || []).map((row: any) => ({
+      idpacienteimagem: row.idpacienteimagem,
+      data: row.data,
+      historico: row.historico,
+      pathimagem: row.pathimagem,
+      iddente: row.iddente,
+      idface: row.idface,
+      orcaimagem: row.orcaimagem,
+      nome_dentista: null // Será buscado separadamente se necessário
+    }))
+    
+  } catch (error) {
+    console.error('Erro ao buscar imagens:', error)
+    return []
+  }
+}
+
+/**
+ * Busca imagens de orçamentos do paciente
+ */
+export async function getPatientOrcamentoImages(idPessoa: number): Promise<OrcamentoImage[]> {
+  try {
+    // Primeiro busca orçamentos do paciente
+    const { data: orcamentosData } = await supabase
+      .from('amb_orcamento')
+      .select('idorcamento, data')
+      .eq('idpaciente', idPessoa)
+    
+    if (!orcamentosData || orcamentosData.length === 0) return []
+    
+    const orcamentosIds = orcamentosData.map(o => o.idorcamento)
+    
+    // Depois busca imagens desses orçamentos
+    const { data, error } = await supabase
+      .from('amb_orcamentoimagem')
+      .select('idorcamentoimagem, idorcamento, data, historico, pathimagem, iddente, idface, orcaimagem, idavaliacao, iddentista')
+      .in('idorcamento', orcamentosIds)
+      .order('data', { ascending: false })
+    
+    if (error) throw error
+    
+    return (data || []).map((row: any) => {
+      const orc = orcamentosData.find(o => o.idorcamento === row.idorcamento)
+      return {
+        idorcamentoimagem: row.idorcamentoimagem,
+        idorcamento: row.idorcamento,
+        data: row.data,
+        historico: row.historico,
+        pathimagem: row.pathimagem,
+        iddente: row.iddente,
+        idface: row.idface,
+        orcaimagem: row.orcaimagem,
+        idavaliacao: row.idavaliacao,
+        nome_dentista: null, // Será buscado separadamente se necessário
+        dtorcamento: orc?.data || ''
+      }
+    })
+    
+  } catch (error) {
+    console.error('Erro ao buscar imagens de orçamentos:', error)
+    return []
+  }
+}
+
+/**
+ * Busca orçamentos ortodônticos do paciente
+ */
+export async function getPatientOrthodontics(idPessoa: number): Promise<Orthodontics[]> {
+  try {
+    const { data, error } = await supabase
+      .from('amb_orcamento')
+      .select('idorcamento, data, total, dtinicio, numparcelas, dtvencimento, iddentista')
+      .eq('idpaciente', idPessoa)
+      .eq('tpregistro', 1) // Ortodôntico
+      .order('data', { ascending: false })
+    
+    if (error) throw error
+    
+    const orcamentos: Orthodontics[] = (data || []).map((row: any) => ({
+      idorcamento: row.idorcamento,
+      dtorcamento: row.data,
+      valortotal: row.total,
+      dtinicio: row.dtinicio,
+      numparcelas: row.numparcelas,
+      dtvencimento: row.dtvencimento,
+      nome_dentista: null, // Será buscado separadamente se necessário
+      itens: []
+    }))
+    
+    // Buscar itens de cada orçamento ortodôntico
+    for (const orc of orcamentos) {
+      const { data: itens } = await supabase
+        .from('amb_orcaitem')
+        .select('idorcaitem, linha, iditem, qtde, valor, idprocedimento')
+        .eq('idorcamento', orc.idorcamento)
+        .order('linha')
+      
+      orc.itens = (itens || []).map((item: any) => ({
+        idorcaitem: item.idorcaitem,
+        item: item.linha || item.iditem?.toString() || '',
+        quantidade: item.qtde,
+        valor: item.valor,
+        nome_procedimento: null // Será buscado separadamente se necessário
+      }))
+    }
+    
+    return orcamentos
+    
+  } catch (error) {
+    console.error('Erro ao buscar ortodontia:', error)
+    return []
+  }
+}

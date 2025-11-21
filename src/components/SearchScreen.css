@@ -1,0 +1,232 @@
+.panel {
+  background: white;
+  border-radius: 20px;
+  padding: 2rem;
+  box-shadow: 0 20px 45px rgba(15, 23, 42, 0.08);
+  margin-bottom: 2rem;
+}
+
+.dashboard-layout.is-dark .panel {
+  background: #1e1b4b;
+  color: #e2e8f0;
+  box-shadow: 0 20px 45px rgba(2, 6, 23, 0.6);
+}
+
+.single-panel {
+  max-width: 960px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.panel-header,
+.panel header {
+  display: flex;
+  justify-content: space-between;
+  align-items: flex-start;
+  gap: 1rem;
+  flex-wrap: wrap;
+  margin-bottom: 1.5rem;
+}
+
+.panel h2 {
+  margin: 0;
+  color: #0f172a;
+}
+
+.panel p {
+  margin: 0.35rem 0 0;
+  color: #6b7280;
+}
+
+.dashboard-layout.is-dark .panel h2 {
+  color: #f8fafc;
+}
+
+.dashboard-layout.is-dark .panel p {
+  color: #cbd5f5;
+}
+
+.ghost-btn {
+  border: 1px dashed #c7cbe2;
+  background: transparent;
+  border-radius: 999px;
+  padding: 0.5rem 1.25rem;
+  font-weight: 600;
+  color: #4f46e5;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.ghost-btn:hover {
+  background: rgba(79, 70, 229, 0.08);
+}
+
+.dashboard-layout.is-dark .ghost-btn {
+  color: #c4b5fd;
+  border-color: rgba(196, 181, 253, 0.5);
+}
+
+.search-bar {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+}
+
+.search-bar input {
+  flex: 1;
+  min-width: 240px;
+  padding: 1rem 1.25rem;
+  border-radius: 14px;
+  border: 1px solid #e2e8f0;
+  font-size: 1rem;
+  background: #f8fafc;
+}
+
+.search-bar input:focus {
+  outline: none;
+  border-color: #4f46e5;
+  background: white;
+  box-shadow: 0 10px 20px rgba(79, 70, 229, 0.12);
+}
+
+.search-bar button {
+  padding: 1rem 2.5rem;
+  border-radius: 14px;
+  border: none;
+  background: linear-gradient(135deg, #6366f1, #8b5cf6);
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  transition: transform 0.2s ease, box-shadow 0.2s ease;
+  box-shadow: 0 15px 30px rgba(99, 102, 241, 0.35);
+}
+
+.search-bar button:disabled {
+  opacity: 0.6;
+  cursor: not-allowed;
+}
+
+.search-bar button:hover:not(:disabled) {
+  transform: translateY(-2px);
+}
+
+.dashboard-layout.is-dark .search-bar input {
+  background: #0f172a;
+  color: #e2e8f0;
+  border-color: #312e81;
+}
+
+.dashboard-layout.is-dark .search-bar button {
+  box-shadow: 0 15px 30px rgba(14, 116, 144, 0.45);
+}
+
+.inline-error {
+  margin-top: 1rem;
+  background: #fee2e2;
+  color: #b91c1c;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  border: 1px solid #fecaca;
+}
+
+.results-panel .results-list {
+  display: grid;
+  gap: 1rem;
+}
+
+.patient-card {
+  background: #f8fafc;
+  border-radius: 16px;
+  padding: 1.5rem;
+  display: flex;
+  gap: 1rem;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  border: 1px solid transparent;
+  transition: border-color 0.2s ease, transform 0.2s ease;
+}
+
+.patient-card:hover {
+  border-color: #c7d2fe;
+  transform: translateX(6px);
+}
+
+.dashboard-layout.is-dark .patient-card {
+  background: #111936;
+  border-color: #2d3a7c;
+  color: #e2e8f0;
+}
+
+.patient-info h3 {
+  margin: 0 0 0.5rem;
+  color: #0f172a;
+}
+
+.dashboard-layout.is-dark .patient-info h3 {
+  color: #f8fafc;
+}
+
+.patient-info p {
+  margin: 0.2rem 0;
+  color: #475569;
+}
+
+.dashboard-layout.is-dark .patient-info p {
+  color: #cbd5f5;
+}
+
+.view-btn {
+  padding: 0.75rem 1.5rem;
+  border-radius: 12px;
+  border: none;
+  background: #0ea5e9;
+  color: white;
+  font-weight: 600;
+  cursor: pointer;
+  box-shadow: 0 12px 24px rgba(14, 165, 233, 0.25);
+  transition: transform 0.2s ease;
+}
+
+.view-btn:hover {
+  transform: translateY(-2px);
+}
+
+.dashboard-layout.is-dark .view-btn {
+  background: linear-gradient(135deg, #2563eb, #7c3aed);
+}
+
+.no-results {
+  text-align: center;
+  padding: 2rem;
+  color: #94a3b8;
+}
+
+@media (max-width: 768px) {
+  .panel {
+    padding: 1.25rem;
+  }
+
+  .panel-header,
+  .panel header {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .search-bar {
+    flex-direction: column;
+  }
+
+  .search-bar button {
+    width: 100%;
+  }
+
+  .patient-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+
+  .view-btn {
+    width: 100%;
+  }
+}
+
