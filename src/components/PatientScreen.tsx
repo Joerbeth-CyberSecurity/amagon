@@ -385,7 +385,7 @@ export function PatientScreen({ patient, onBack, theme, onToggleTheme, currentUs
                     </tr>
                   </thead>
                   <tbody>
-                    {appointments.slice(0, 10).map((apt: any) => (
+                    {appointments.map((apt: any) => (
                       <tr key={apt.idmarcacao}>
                         <td>{formatDate(apt.dtmarcacao)}</td>
                         <td>{apt.hrmarcacao || '-'}</td>
@@ -422,7 +422,7 @@ export function PatientScreen({ patient, onBack, theme, onToggleTheme, currentUs
               <p className="no-data">Nenhum dado clínico encontrado</p>
             ) : (
               <div className="section-card-list">
-                {clinical.slice(0, 5).map((orc: any) => {
+                {clinical.map((orc: any) => {
                   const tipoContrato =
                     orc.tpregistro === 0 ? 'Clínico' :
                     orc.tpregistro === 1 ? 'Ortodôntico' : 'Mensal'
@@ -480,7 +480,7 @@ export function PatientScreen({ patient, onBack, theme, onToggleTheme, currentUs
                     </tr>
                   </thead>
                   <tbody>
-                    {financial.lancamentos.slice(0, 10).map((lanc: any) => (
+                    {financial.lancamentos.map((lanc: any) => (
                       <tr key={lanc.idlancamento}>
                         <td>{formatDate(lanc.dtvencimento)}</td>
                         <td>{formatCurrency(lanc.valorlancamento)}</td>
@@ -506,7 +506,7 @@ export function PatientScreen({ patient, onBack, theme, onToggleTheme, currentUs
                     </tr>
                   </thead>
                   <tbody>
-                    {financial.movimentacoes.slice(0, 10).map((mov: any) => (
+                    {financial.movimentacoes.map((mov: any) => (
                       <tr key={mov.idmovconta}>
                         <td>{formatDate(mov.dtmovimento)}</td>
                         <td>{formatCurrency(mov.valormovimento)}</td>
@@ -603,7 +603,7 @@ export function PatientScreen({ patient, onBack, theme, onToggleTheme, currentUs
                   <div className="data-section">
                     <h3>Imagens do Paciente</h3>
                     <div className="section-card-list">
-                      {images.slice(0, 5).map((img: any) => (
+                      {images.map((img: any) => (
                         <div key={img.idpacienteimagem} className="section-card">
                           <div className="data-grid">
                             <DataItem label="Data" value={formatDate(img.data)} />
@@ -637,7 +637,7 @@ export function PatientScreen({ patient, onBack, theme, onToggleTheme, currentUs
                   <div className="data-section" style={{ marginTop: '20px' }}>
                     <h3>Imagens de Orçamentos</h3>
                     <div className="section-card-list">
-                      {orcamentoImages.slice(0, 5).map((img: any) => (
+                      {orcamentoImages.map((img: any) => (
                         <div key={img.idorcamentoimagem} className="section-card">
                           <div className="data-grid">
                             <DataItem label="Data" value={formatDate(img.data)} />

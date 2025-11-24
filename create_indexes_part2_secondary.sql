@@ -6,6 +6,7 @@
 -- ============================================================================
 
 -- Índices adicionais para amb_marcacao
+-- NOTA: idx_amb_marcacao_iddentista já foi criado na Parte 1, mas o IF NOT EXISTS evita erro
 CREATE INDEX IF NOT EXISTS idx_amb_marcacao_iddentista ON amb_marcacao(iddentista);
 CREATE INDEX IF NOT EXISTS idx_amb_marcacao_data ON amb_marcacao(data DESC);
 
@@ -17,7 +18,9 @@ CREATE INDEX IF NOT EXISTS idx_amb_orcamento_tpregistro ON amb_orcamento(tpregis
 
 -- Índices para amb_orcaitem (itens de orçamento)
 CREATE INDEX IF NOT EXISTS idx_amb_orcaitem_idorcamento ON amb_orcaitem(idorcamento);
-CREATE INDEX IF NOT EXISTS idx_amb_orcaitem_idprocedimento ON amb_orcaitem(idprocedimento);
+-- NOTA: Comentado temporariamente - verifique se a coluna idprocedimento existe em amb_orcaitem
+-- Execute verificar_colunas_procedimento.sql para verificar
+-- CREATE INDEX IF NOT EXISTS idx_amb_orcaitem_idprocedimento ON amb_orcaitem(idprocedimento);
 
 -- Índices para fin_movconta (movimentações financeiras)
 CREATE INDEX IF NOT EXISTS idx_fin_movconta_idlancamento ON fin_movconta(idlancamento);
