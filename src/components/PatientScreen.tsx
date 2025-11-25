@@ -14,7 +14,7 @@ import {
   getPatientOrcamentoImages,
   getPatientOrthodontics
 } from '@/services/patientService'
-import { formatDate, formatCurrency, formatCPF, normalizeText } from '@/utils/formatters'
+import { formatDate, formatCurrency, formatCPF } from '@/utils/formatters'
 import './PatientScreen.css'
 
 interface PatientScreenProps {
@@ -39,42 +39,12 @@ const DataItem = ({ label, value, fullWidth = false }: DataItemProps) => (
   </div>
 )
 
-const formatFlagValue = (value?: number | null) => {
-  if (value === null || value === undefined) return '-'
-  if (value === 1) return 'Sim'
-  if (value === 0) return 'Não'
-  return `Cód. ${value}`
-}
-
-const formatCurrencyOrDash = (value?: number | null) => {
-  if (value === null || value === undefined) return '-'
-  return formatCurrency(value)
-}
-
 const getTipoRegistroLabel = (tpregistro?: number | null) => {
   if (tpregistro === 0) return 'Clínico'
   if (tpregistro === 1) return 'Ortodôntico'
   if (tpregistro === 2) return 'Mensal'
   if (tpregistro === undefined || tpregistro === null) return '-'
   return `Tipo ${tpregistro}`
-}
-
-const hasRepasseInfo = (repasse?: any) => {
-  if (!repasse) return false
-  return Boolean(
-    repasse.dtrepasse ||
-    repasse.vr_repasse ||
-    repasse.isvrrepasse ||
-    repasse.vr_baserepasse ||
-    repasse.motivorepasse
-  )
-}
-
-const getReadableText = (value?: string | null, fallback = '-') => {
-  if (!value || value.trim().length === 0) return fallback
-  const normalized = normalizeText(value)
-  if (normalized && normalized.trim().length > 0) return normalized
-  return value
 }
 
 export function PatientScreen({ patient, onBack, theme, onToggleTheme, currentUserName, onLogout }: PatientScreenProps) {
