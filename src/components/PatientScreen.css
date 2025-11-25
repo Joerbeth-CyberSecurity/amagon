@@ -217,6 +217,64 @@
   color: #c7d2fe;
 }
 
+.section-card-note {
+  margin-top: 1rem;
+  padding: 0.75rem 1rem;
+  border-radius: 12px;
+  background: #eef2ff;
+  color: #1e1b4b;
+  border: 1px solid #c7d2fe;
+}
+
+.dashboard-layout.is-dark .section-card-note {
+  background: rgba(49, 46, 129, 0.4);
+  color: #e0e7ff;
+  border-color: #4c1d95;
+}
+
+.section-card-note strong {
+  display: block;
+  margin-bottom: 0.35rem;
+}
+
+.section-card-note p {
+  margin: 0;
+  white-space: pre-wrap;
+  line-height: 1.4;
+  color: inherit;
+}
+
+.section-card-header-info {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+}
+
+.section-card-toggle {
+  border: 1px solid #cbd5f5;
+  background: #fff;
+  color: #4338ca;
+  font-weight: 600;
+  border-radius: 999px;
+  padding: 0.35rem 0.9rem;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.section-card-toggle:hover {
+  background: #eef2ff;
+}
+
+.dashboard-layout.is-dark .section-card-toggle {
+  background: #1f2a44;
+  border-color: #334155;
+  color: #c7d2fe;
+}
+
+.dashboard-layout.is-dark .section-card-toggle:hover {
+  background: #2d3a5c;
+}
+
 .section-card-subtitle {
   margin: 1rem 0 0.5rem;
   font-weight: 600;
@@ -228,6 +286,93 @@
 
 .dashboard-layout.is-dark .section-card-subtitle {
   color: #cbd5f5;
+}
+
+.budget-detail-grid {
+  margin-top: 1rem;
+}
+
+.budget-items-table-wrapper {
+  margin-top: 1.25rem;
+}
+
+.budget-summary {
+  background: rgba(99, 102, 241, 0.08);
+  border-radius: 12px;
+  padding: 0.85rem 1rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.35rem;
+  border: 1px solid rgba(99, 102, 241, 0.2);
+}
+
+.budget-summary p {
+  margin: 0;
+  color: #111936;
+  font-weight: 500;
+}
+
+.budget-summary strong {
+  color: #312e81;
+  margin-right: 0.35rem;
+}
+
+.dashboard-layout.is-dark .budget-summary {
+  background: rgba(79, 70, 229, 0.15);
+  border-color: rgba(129, 140, 248, 0.3);
+}
+
+.dashboard-layout.is-dark .budget-summary p,
+.dashboard-layout.is-dark .budget-summary strong {
+  color: #e0e7ff;
+}
+
+.budget-simple-table .data-table th,
+.budget-simple-table .data-table td {
+  text-align: left;
+}
+
+.budget-simple-table .data-table td:nth-child(4),
+.budget-simple-table .data-table th:nth-child(4) {
+  text-align: right;
+  white-space: nowrap;
+}
+
+.budget-simple-table .data-table th {
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+.budget-item-proc {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.budget-item-proc small {
+  color: #94a3b8;
+}
+
+.dashboard-layout.is-dark .budget-item-proc small {
+  color: #cbd5f5;
+}
+
+.budget-repasse-cell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+}
+
+.budget-repasse-cell span {
+  font-size: 0.85rem;
+}
+
+.budget-repasse-cell small {
+  color: #64748b;
+}
+
+.dashboard-layout.is-dark .budget-repasse-cell small {
+  color: #a5b4fc;
 }
 
 .procedure-list {

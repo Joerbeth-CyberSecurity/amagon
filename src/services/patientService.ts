@@ -202,7 +202,39 @@ export async function getPatientClinicalData(idPessoa: number): Promise<Clinical
   try {
     const { data, error } = await supabase
       .from('amb_orcamento')
-      .select('idorcamento, data, total, tpregistro, iddentista')
+      .select(`
+        idorcamento,
+        nunorca,
+        data,
+        total,
+        tpregistro,
+        iddentista,
+        idpaciente,
+        idconvenio,
+        idplano,
+        idclinica,
+        numguia,
+        isfechado,
+        idatendimento,
+        dtentper,
+        idorcamentosituacao,
+        matricula,
+        titular,
+        obs,
+        descacre,
+        tpdescacre,
+        maxfaseorca,
+        interfaseorca,
+        issinaisdoenca,
+        isalttecidomoles,
+        desativado,
+        system,
+        hidden,
+        totcopart,
+        dtinicio,
+        numparcelas,
+        dtvencimento
+      `)
       .eq('idpaciente', idPessoa)
       .order('data', { ascending: false })
     
@@ -229,12 +261,45 @@ export async function getPatientClinicalData(idPessoa: number): Promise<Clinical
     
     const orcamentosIds = data.map((o: any) => o.idorcamento)
     
-    // Buscar TODOS os itens de uma vez (otimização)
-    const { data: allItens } = await supabase
-      .from('amb_orcaitem')
-      .select('idorcaitem, idorcamento, linha, iditem, qtde, valor, idprocedimento')
-      .in('idorcamento', orcamentosIds)
-      .order('linha', { ascending: true, nullsFirst: false })
+    let allItens: any[] = []
+    if (orcamentosIds.length > 0) {
+      const { data: itensData, error: itensError } = await supabase
+        .from('amb_orcaitem')
+        .select(`
+          idorcaitem,
+          idorcamento,
+          linha,
+          iditem,
+          qtde,
+          valor,
+          total,
+          desconto,
+          data,
+          iddentista,
+          isrealizado,
+          isfaturado,
+          obs,
+          numerodente,
+          faseorcamento,
+          dtrepasse,
+          vr_repasse,
+          isvrrepasse,
+          vr_baserepasse,
+          motivorepasse,
+          usuarioinc,
+          datainc,
+          usuarioalt,
+          dataalt
+        `)
+        .in('idorcamento', orcamentosIds)
+        .order('linha', { ascending: true, nullsFirst: false })
+      
+      if (itensError) {
+        console.error('Erro ao buscar itens de orçamento:', itensError)
+      }
+      
+      allItens = itensData || []
+    }
     
     // Agrupar itens por orçamento
     const itensPorOrcamento = new Map<number, any[]>()
@@ -248,19 +313,20 @@ export async function getPatientClinicalData(idPessoa: number): Promise<Clinical
     }
     
     // Buscar TODOS os procedimentos de uma vez (otimização)
-    const procedimentosIds = [...new Set((allItens || []).map((i: any) => i.idprocedimento).filter(Boolean))]
-    const procedimentosMap = new Map<number, { nome: string; codigo: string | null }>()
+    const procedimentosIds = [...new Set((allItens || []).map((i: any) => i.iditem).filter(Boolean))]
+    const procedimentosMap = new Map<number, { nome: string; codigo: string | null; numero: string | null }>()
     if (procedimentosIds.length > 0) {
       const { data: procedimentos } = await supabase
         .from('fat_procedimento')
-        .select('idprocedimento, procedimento, codigo')
+        .select('idprocedimento, procedimento, codprocedimento, numprocedimento')
         .in('idprocedimento', procedimentosIds)
       
       if (procedimentos) {
         for (const proc of procedimentos) {
           procedimentosMap.set(proc.idprocedimento, {
             nome: proc.procedimento || '',
-            codigo: proc.codigo || null
+            codigo: proc.codprocedimento || null,
+            numero: proc.numprocedimento || null
           })
         }
       }
@@ -271,22 +337,76 @@ export async function getPatientClinicalData(idPessoa: number): Promise<Clinical
       
       return {
         idorcamento: row.idorcamento,
+        nunorca: row.nunorca,
         dtorcamento: row.data,
         valortotal: row.total,
         tpregistro: row.tpregistro,
         nome_dentista: row.iddentista ? dentistasMap.get(row.iddentista) || null : null,
+        idconvenio: row.idconvenio,
+        idplano: row.idplano,
+        idclinica: row.idclinica,
+        numguia: row.numguia,
+        idorcamentosituacao: row.idorcamentosituacao,
+        obs: row.obs,
+        descacre: row.descacre,
+        tpdescacre: row.tpdescacre,
+        dtinicio: row.dtinicio,
+        dtvencimento: row.dtvencimento,
+        numparcelas: row.numparcelas,
+        isfechado: row.isfechado,
+        matricula: row.matricula,
+        titular: row.titular,
+        totcopart: row.totcopart,
         itens: itens.map((item: any) => {
-          const proc = item.idprocedimento ? procedimentosMap.get(item.idprocedimento) : null
-          const nome_procedimento = proc?.nome || null
-          const codigo_procedimento = proc?.codigo || null
+          const procInfo = item.iditem ? procedimentosMap.get(item.iditem) : null
+          const nome_procedimento = procInfo?.nome || null
+          const codigo_procedimento = procInfo?.codigo || procInfo?.numero || null
           const item_cod = item.linha || codigo_procedimento || item.iditem?.toString() || ''
+          const repasseData =
+            item.dtrepasse ||
+            item.vr_repasse ||
+            item.isvrrepasse ||
+            item.vr_baserepasse ||
+            item.motivorepasse
+              ? {
+                  dtrepasse: item.dtrepasse,
+                  vr_repasse: item.vr_repasse,
+                  isvrrepasse: item.isvrrepasse,
+                  vr_baserepasse: item.vr_baserepasse,
+                  motivorepasse: item.motivorepasse
+                }
+              : null
+          const auditoriaData =
+            item.usuarioinc ||
+            item.datainc ||
+            item.usuarioalt ||
+            item.dataalt
+              ? {
+                  usuarioinc: item.usuarioinc,
+                  datainc: item.datainc,
+                  usuarioalt: item.usuarioalt,
+                  dataalt: item.dataalt
+                }
+              : null
           
           return {
             idorcaitem: item.idorcaitem,
             item: item_cod,
+            proc: item_cod,
+            descricao: nome_procedimento,
             quantidade: item.qtde,
             valor: item.valor,
-            nome_procedimento
+            nome_procedimento,
+            total: item.total,
+            desconto: item.desconto,
+            data: item.data,
+            numerodente: item.numerodente,
+            faseorcamento: item.faseorcamento,
+            situacao_realizacao: item.isrealizado,
+            situacao_faturamento: item.isfaturado,
+            observacao: item.obs,
+            repasse: repasseData,
+            auditoria: auditoriaData
           }
         })
       }
@@ -369,14 +489,30 @@ export async function getPatientClinicalTeam(idPessoa: number): Promise<Clinical
       })
       data = result.data
       error = result.error
-    } catch (rpcError) {
-      // RPC não existe, fazer fallback
-      error = { code: 'PGRST116' }
+      
+      // Se RPC não existe (404 ou função não encontrada), usar fallback sem mostrar erro
+      if (error && (
+        error.code === 'P0001' || 
+        error.message?.includes('404') || 
+        error.message?.includes('does not exist') ||
+        error.message?.includes('function') ||
+        error.hint?.includes('function')
+      )) {
+        error = null // Ignora erro de RPC não encontrado
+        data = null // Força usar fallback
+      }
+    } catch (rpcError: any) {
+      // Ignora erros de RPC não encontrado (404)
+      if (rpcError?.code === 'P0001' || rpcError?.message?.includes('404') || rpcError?.message?.includes('does not exist')) {
+        error = null
+        data = null
+      } else {
+        error = rpcError
+      }
     }
     
-    if (error && error.code !== 'PGRST116') {
-      // Outro tipo de erro, fazer fallback
-      // Se a function nÃ£o existir, fazer query manual
+    if (error || !data) {
+      // Fallback completo quando RPC não existir ou falhar
       const { data: marcacoes } = await supabase
         .from('amb_marcacao')
         .select('iddentista')
@@ -624,11 +760,15 @@ export async function getPatientOrthodontics(idPessoa: number): Promise<Orthodon
     
     // Buscar TODOS os itens de uma vez (otimização)
     const orcamentosIds = orcamentos.map(o => o.idorcamento)
-    const { data: allItens } = await supabase
-      .from('amb_orcaitem')
-      .select('idorcaitem, idorcamento, linha, iditem, qtde, valor, idprocedimento')
-      .in('idorcamento', orcamentosIds)
-      .order('linha', { ascending: true, nullsFirst: false })
+    let allItens: any[] = []
+    if (orcamentosIds.length > 0) {
+      const { data: itensData } = await supabase
+        .from('amb_orcaitem')
+        .select('idorcaitem, idorcamento, linha, iditem, qtde, valor, idprocedimento')
+        .in('idorcamento', orcamentosIds)
+        .order('linha', { ascending: true, nullsFirst: false })
+      allItens = itensData || []
+    }
     
     // Agrupar itens por orçamento
     const itensPorOrcamento = new Map<number, any[]>()

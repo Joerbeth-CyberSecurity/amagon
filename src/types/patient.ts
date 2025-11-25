@@ -24,20 +24,61 @@ export interface Appointment {
 
 // ===== CLINICAL DATA TYPES =====
 
+export interface OrcamentoItemRepasse {
+  dtrepasse?: string | null
+  vr_repasse?: number | null
+  isvrrepasse?: number | null
+  vr_baserepasse?: number | null
+  motivorepasse?: string | null
+}
+
+export interface OrcamentoItemAuditoria {
+  usuarioinc?: number | null
+  datainc?: string | null
+  usuarioalt?: number | null
+  dataalt?: string | null
+}
+
 export interface OrcamentoItem {
   idorcaitem: number
   item: string
   quantidade: number
   valor: number
   nome_procedimento: string | null
+  total?: number | null
+  desconto?: number | null
+  data?: string | null
+  numerodente?: number | null
+  faseorcamento?: number | null
+  situacao_realizacao?: number | null
+  situacao_faturamento?: number | null
+  observacao?: string | null
+  repasse?: OrcamentoItemRepasse | null
+  auditoria?: OrcamentoItemAuditoria | null
 }
 
 export interface ClinicalData {
   idorcamento: number
+  nunorca?: string | null
   dtorcamento: string
   valortotal: number
   tpregistro: number
   nome_dentista: string | null
+  idconvenio?: number | null
+  idplano?: number | null
+  idclinica?: number | null
+  numguia?: number | null
+  idorcamentosituacao?: number | null
+  obs?: string | null
+  descacre?: number | null
+  tpdescacre?: string | null
+  dtinicio?: string | null
+  dtvencimento?: string | null
+  numparcelas?: number | null
+  isfechado?: number | null
+  matricula?: string | null
+  titular?: string | null
+  totcopart?: number | null
   itens?: OrcamentoItem[]
 }
 

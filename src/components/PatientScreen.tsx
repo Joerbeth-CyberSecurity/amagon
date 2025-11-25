@@ -14,7 +14,7 @@ import {
   getPatientOrcamentoImages,
   getPatientOrthodontics
 } from '@/services/patientService'
-import { formatDate, formatCurrency, formatCPF } from '@/utils/formatters'
+import { formatDate, formatCurrency, formatCPF, normalizeText } from '@/utils/formatters'
 import './PatientScreen.css'
 
 interface PatientScreenProps {
@@ -38,6 +38,44 @@ const DataItem = ({ label, value, fullWidth = false }: DataItemProps) => (
     <span>{value}</span>
   </div>
 )
+
+const formatFlagValue = (value?: number | null) => {
+  if (value === null || value === undefined) return '-'
+  if (value === 1) return 'Sim'
+  if (value === 0) return 'Não'
+  return `Cód. ${value}`
+}
+
+const formatCurrencyOrDash = (value?: number | null) => {
+  if (value === null || value === undefined) return '-'
+  return formatCurrency(value)
+}
+
+const getTipoRegistroLabel = (tpregistro?: number | null) => {
+  if (tpregistro === 0) return 'Clínico'
+  if (tpregistro === 1) return 'Ortodôntico'
+  if (tpregistro === 2) return 'Mensal'
+  if (tpregistro === undefined || tpregistro === null) return '-'
+  return `Tipo ${tpregistro}`
+}
+
+const hasRepasseInfo = (repasse?: any) => {
+  if (!repasse) return false
+  return Boolean(
+    repasse.dtrepasse ||
+    repasse.vr_repasse ||
+    repasse.isvrrepasse ||
+    repasse.vr_baserepasse ||
+    repasse.motivorepasse
+  )
+}
+
+const getReadableText = (value?: string | null, fallback = '-') => {
+  if (!value || value.trim().length === 0) return fallback
+  const normalized = normalizeText(value)
+  if (normalized && normalized.trim().length > 0) return normalized
+  return value
+}
 
 export function PatientScreen({ patient, onBack, theme, onToggleTheme, currentUserName, onLogout }: PatientScreenProps) {
   const [loading, setLoading] = useState(false)
@@ -73,10 +111,15 @@ export function PatientScreen({ patient, onBack, theme, onToggleTheme, currentUs
         getPatientOrthodontics(patient.idpessoa).catch(() => [])
       ])
 
+      const normalizedClinical = (clinical || []).map((orc: any) => ({
+        ...orc,
+        itens: orc.itens ?? orc.ITENS ?? orc.items ?? []
+      }))
+
       setPatientData({
         patient: fullPatient,
         appointments,
-        clinical,
+        clinical: normalizedClinical,
         financial,
         clinicalTeam,
         anamnese,
@@ -421,41 +464,68 @@ export function PatientScreen({ patient, onBack, theme, onToggleTheme, currentUs
             {clinical.length === 0 ? (
               <p className="no-data">Nenhum dado clínico encontrado</p>
             ) : (
-              <div className="section-card-list">
+              <div className="clinical-items">
                 {clinical.map((orc: any) => {
-                  const tipoContrato =
-                    orc.tpregistro === 0 ? 'Clínico' :
-                    orc.tpregistro === 1 ? 'Ortodôntico' : 'Mensal'
+                  const tipoContrato = getTipoRegistroLabel(orc.tpregistro)
+                  
+                  // Mapear itens exatamente como no código de referência (Teste)
+                  // O service retorna: item/proc, descricao/nome_procedimento, quantidade, valor
+                  const budgetItems = (orc.itens ?? []).map((item: any) => {
+                    // Proc: priorizar ITEM (formato do Teste), depois item/proc (formato do service)
+                    const proc = item.ITEM ?? item.item ?? item.proc ?? '-'
+                    
+                    // Descrição: priorizar NOME_PROCEDIMENTO (formato do Teste), depois nome_procedimento/descricao (formato do service)
+                    const descricao = item.NOME_PROCEDIMENTO ?? item.nome_procedimento ?? item.descricao ?? '-'
+                    
+                    // Quantidade: priorizar QUANTIDADE (formato do Teste), depois quantidade/qtde (formato do service)
+                    const quantidade = item.QUANTIDADE ?? item.quantidade ?? item.qtde ?? 1
+                    
+                    // Valor: priorizar VALOR (formato do Teste), depois valor (formato do service)
+                    const rawValor = item.VALOR ?? item.valor ?? 0
+                    const valor = typeof rawValor === 'number' ? rawValor : Number(rawValor) || 0
+
+                    return {
+                      idorcaitem: item.idorcaitem,
+                      proc: String(proc),
+                      descricao: String(descricao),
+                      quantidade: Number(quantidade) || 1,
+                      valor: Number(valor) || 0
+                    }
+                  })
 
                   return (
-                    <div key={orc.idorcamento} className="section-card">
-                      <div className="section-card-header">
-                        <h4>Orçamento #{orc.idorcamento}</h4>
-                        <span className="section-card-tag">{tipoContrato}</span>
-                      </div>
-                      <div className="data-grid">
-                        <DataItem label="Data" value={formatDate(orc.dtorcamento)} />
-                        <DataItem label="Dentista" value={orc.nome_dentista || '-'} />
-                        <DataItem label="Valor Total" value={formatCurrency(orc.valortotal)} />
-                        <DataItem label="Status" value={orc.status || '-'} />
-                      </div>
+                    <div key={orc.idorcamento} className="clinical-item">
+                      <h3>{`Orçamento #${orc.idorcamento} - ${tipoContrato}`}</h3>
+                      <p><strong>Data:</strong> {formatDate(orc.dtorcamento)}</p>
+                      <p><strong>Dentista:</strong> {orc.nome_dentista || '-'}</p>
+                      <p><strong>Valor Total:</strong> {formatCurrency(orc.valortotal)}</p>
 
-                      {orc.itens && orc.itens.length > 0 && (
-                        <div className="procedure-list">
-                          <p className="section-card-subtitle">Procedimentos</p>
-                          {orc.itens.map((item: any) => (
-                            <div key={item.idorcaitem} className="procedure-card">
-                              <div>
-                                <strong>{item.item || '-'}</strong>
-                                <span>{item.nome_procedimento || '-'}</span>
-                              </div>
-                              <div className="procedure-meta">
-                                <span>{item.quantidade || 1}x</span>
-                                <span>{formatCurrency(item.valor)}</span>
-                              </div>
-                            </div>
-                          ))}
-                        </div>
+                      {budgetItems.length > 0 && (
+                        <>
+                          <h4>Procedimentos:</h4>
+                          <div className="table-container">
+                            <table className="data-table">
+                              <thead>
+                                <tr>
+                                  <th>Proc</th>
+                                  <th>Descrição</th>
+                                  <th>Quantidade</th>
+                                  <th>Valor</th>
+                                </tr>
+                              </thead>
+                              <tbody>
+                                {budgetItems.map((item: any, index: number) => (
+                                  <tr key={`orc-${orc.idorcamento}-item-${item.idorcaitem ?? index}`}>
+                                    <td>{item.proc}</td>
+                                    <td>{item.descricao}</td>
+                                    <td>{item.quantidade}</td>
+                                    <td>{formatCurrency(item.valor)}</td>
+                                  </tr>
+                                ))}
+                              </tbody>
+                            </table>
+                          </div>
+                        </>
                       )}
                     </div>
                   )
